@@ -1,0 +1,67 @@
+Pij = c - [w/2 , h/2] + [(w/N) * (j+0.5) , (h/M) * (i + 0.5)]
+
+c = center point
+w = width in space
+h = height in space
+N = width in pixels
+M = height in pixels
+
+typedef struct Ray {
+	double o[3];
+	double d[3];
+} Ray;
+
+pseudocode:
+
+pixel_height = (float)h / (float)M
+pixel_width = (float)w / (float)N
+
+p_z = -z_p // viewplane z- coord
+for (int i = 0; i < M; i+=1)
+{
+	p_y = c_y - h/2.0 + pixel_height * (i + 0.5)
+	for(int j = 0; j < N; j+=1)
+	{
+		p_x = c_x - w/2.0 + pixel_width * (j + 0.5)
+		
+		// unit ray vector
+		rd = p / p.length // normalization
+		r0 = p
+		
+		x = shoot(r0, rd) // an intersection point x
+		
+		image[i * N + j] = shade(x); // returns a color
+	}
+}
+// then write image buffer to file
+
+
+(x,y) function shoot(r0, rd)
+{
+	R(t) = r0 + rd*t
+	ax + by + cz + d = 0
+	
+	t = -(a*x0 + b*y0 + c*z0) / (a*xd + b*yd + c*zd)
+	
+	Sphere:
+	
+	At^2 + Bt + C = 0
+	where
+		
+		A = xd^2 + yd^2 + zd^2
+		B = 2 * (zd * (x0 - xc) + yd * (y0 - yc) + xd * (z0 - zc))
+		C = (x0 - xc)^2 + (y0 - yc)^2 + (z0 - zc)^2 - r^2
+		
+		then use quadratic equation
+		
+		
+		
+	
+}
+
+(r,g,b) function shade(x)
+{
+	// come back later
+}
+
+
