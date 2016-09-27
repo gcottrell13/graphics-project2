@@ -116,14 +116,12 @@ char* parse_string(FILE* file)
 	return strdup(buffer);
 }
 
-int read_scene(char* json_name)
+Scene read_scene(char* json_name)
 {
-	
 	FILE * json = fopen(json_name, "r");
 	int c;
 	
 	skip_ws(json);
-	
 	
 	// find beginning of file
 	expect_c(json, '[');
@@ -136,7 +134,6 @@ int read_scene(char* json_name)
 		fprintf(srderr, "Warning: empty scene file.\n");
 		return 0;
 	}
-	
 	
 	Scene scene = malloc(sizeof(Scene));
 	
@@ -375,7 +372,7 @@ int read_scene(char* json_name)
 	}
 	
 	fclose(json);
-	return 0;
+	return scene;
 }
 
 
@@ -413,6 +410,83 @@ void raycast(Scene scene, char* outfile, PPMmeta fileinfo)
 	
 	// raycasting here
 	
+	int N = fileinfo.width;
+	int M = fileinfo.height;
+	double w = scene.camera_width;
+	double h = scene.camera_height;
+	
+	double pixel_height = h / M;
+	double pixel_width = W / N;
+	
+	double p_z = -1;
+	
+	double c_x = 0;
+	double c_y = 0;
+	double c_z = 0;
+	
+	double r0[3];
+	r0[2] = p_z;
+	
+	double rd[3];
+	rd[0] = 0;
+	rd[1] = 0;
+	rd[2] = 1;
+	
+	int i;
+	int j;
+	int k;
+	
+	for(i = 0; i < M; i ++)
+	{
+		double p_y = c_y - h/2.0 + pixel_height * (i + 0.5);
+		r0[1] = p_y;
+		
+		for(j = 0; j < N; j ++)
+		{
+			double p_x = c_x - w/2.0 + pixel_width * (j + 0.5);
+			r0[0] = p_x;
+			
+			double best_t = INFINITY;
+			Object closest;
+			
+			for(k = 0; k < scene.num_objects; k ++)
+			{
+				double t;
+				Object o = scene.objects[k];
+				
+				if(o.kind == T_SPHERE)
+				{
+					double c[3];
+					c[0] = o.a;
+					c[1] = o.b;
+					c[2] = o.c;
+					
+					t = intersect_sphere(c, o.d, r0, rd);
+				}
+				else if(o.kind == T_PLANE)
+				{
+					t = intersect_plane(o.a, o.b, o.c, r0, rd);
+				}
+				
+				if(t > 0 && t < best_t)
+				{
+					best_t = t;
+					closest = o;
+				}
+			}
+			
+			// write to Pixel* data
+			
+			Pixel pixel;
+			pixel.r = closest.color[0];
+			pixel.g = closest.color[1];
+			pixel.b = closest.color[2];
+			
+			data[i * N + j] = pixel;
+			
+		}
+		
+	}
 	
 	
 	WritePPM(data, outfile, 6, fileinfo);
@@ -434,6 +508,10 @@ int main(int argc, char** argv)
 	fileinfo.width = atoi(argv[1]);
 	fileinfo.height = atoi(argv[2]);
 	fileinfo.max = 255;
+	
+	Scene scene = read_scene(argv[3]);
+	
+	raycast(scene, argv[4], fileinfo);
 	
 	return 0;
 }
