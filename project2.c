@@ -200,7 +200,7 @@ Scene read_scene(char* json_name)
 			{
 				// stop parsing object
 				break;
-			} 
+			}
 			else if (c == ',')
 			{
 				// read another field
@@ -506,7 +506,7 @@ void raycast(Scene scene, char* outfile, PPMmeta fileinfo)
 	}
 	
 	
-	WritePPM(data, outfile, 6, fileinfo);
+	WritePPM(data, outfile, fileinfo);
 }
 
 
@@ -525,6 +525,7 @@ int main(int argc, char** argv)
 	fileinfo.width = atoi(argv[1]);
 	fileinfo.height = atoi(argv[2]);
 	fileinfo.max = 255;
+	fileinfo.type = 6;
 	
 	Scene scene = read_scene(argv[3]);
 	

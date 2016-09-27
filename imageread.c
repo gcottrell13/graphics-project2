@@ -9,6 +9,7 @@ typedef struct {
 	int width;
 	int height;
 	int max;
+	int type;
 } PPMmeta;
 
 // functions that will verify PPM, then check which type (ascii P3 or rawbits P6)
@@ -20,9 +21,10 @@ int WritePPM(Pixel* data, char* output, int out_type, PPMmeta meta);
 char* intToStr(int i, int size);
 
 
-int WritePPM(Pixel* data, char* output, int out_type, PPMmeta meta)
+int WritePPM(Pixel* data, char* output, PPMmeta meta)
 {
 	FILE *out = fopen(output, "w+");
+	int out_type = meta.type;
 	
 	// values are newline delimited
 	
