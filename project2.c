@@ -2,29 +2,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CAMERA 1
-#define SPHERE 2
-#define PLANE 3
+#include "3dmath.c"
+
+#define T_CAMERA 1
+#define T_SPHERE 2
+#define T_PLANE 3
 
 int line = 1;
 
 typedef struct {
+	int kind;
+	double color[3];
 	double a;
 	double b;
 	double c;
 	double d;
-} Plane;
-typedef struct {
-	double a;
-	double b;
-	double c;
-} Sphere;
+} Object;
 
 typedef struct {
-	unsigned int spheres[128]; // holds addresses for sphere structs, structs should be malloc'ed
-	unsigned int planes[128]; // holds addresses for plane structs
-	int num_spheres;
-	int num_planes;
+	int num_objects;
+	Object objects[128];
 	double camera_width;
 	double camera_height;
 } Scene;
@@ -50,7 +47,7 @@ int expect_c(FILE* file, int d)
 void skip_ws(FILE* file)
 {
 	int c = next_c(file);
-	while(isspace(c))
+	while(c == 10 || c == ' ')
 	{
 		c = next_c(file);
 	}
@@ -143,12 +140,13 @@ int read_scene(char* json_name)
 	
 	Scene scene = malloc(sizeof(Scene));
 	
-	// these will hold data for any planes and spheres parsed later
-	Plane _plane = malloc(sizeof(Plane));
-	Sphere _sphere = malloc(sizeof(Plane));
+	// these will hold data for any objects parsed later
+	Object new_object = malloc(sizeof(Plane));
 	
 	int set_camera_width = 0;
+	double camera_width = 0;
 	int set_camera_height = 0;
+	double camera_height = 0;
 	
 	while(1)
 	{
@@ -172,7 +170,7 @@ int read_scene(char* json_name)
 		int objtype = 0;
 		
 		int set_radius = 0;
-		int radius = 0; // just in case a sphere is read in
+		double radius = 0; // just in case a sphere is read in
 		int set_color = 0;
 		double color[3];
 		int set_normal = 0;
@@ -181,16 +179,19 @@ int read_scene(char* json_name)
 		double position[3];
 		
 		if(strcmp(value, "camera") == 0) {
-			objtype = CAMERA;
+			objtype = T_CAMERA;
 		} else if(strcmp(value, "sphere") == 0) {
-			objtype = SPHERE;
+			objtype = T_SPHERE;
 		} else if(strcmp(value, "plane") == 0) {
-			objtype = PLANE;
+			objtype = T_PLANE;
 		} else {
 			
 			fprintf(stderr, "Unknown type \"%s\" on line %d\n", value, line);
 			exit(1);
 		}
+		
+		// copy the information into the new object
+		new_object.kind = objtype;
 		
 		skip_ws(json);
 		
@@ -211,35 +212,47 @@ int read_scene(char* json_name)
 				expect_c(json, ':');
 				skip_ws(json);
 				
-				if((strcmp(key, "width") == 0) || 
-					(strcmp(key, "height") == 0) || 
-					(strcmp(key, "radius") == 0))
+					if(objtype == T_CAMERA)
 					{
-						double value = next_number(json);
-						if(objtype == CAMERA)
+						if(strcmp(key, "width") == 0)
 						{
-							if(strcmp(key, "width") == 0)
-							{
-								camera_width = value;
-								set_camera_width = 1;
-							}
-							else if(strcmp(key, "height") == 0)
-							{
-								camera_height = value;
-								set_camera_height = 1;
-							}
+							double value = next_number(json);
+							camera_width = value;
+							set_camera_width = 1;
 						}
-						if(objtype == SPHERE)
+						else if(strcmp(key, "height") == 0)
 						{
+							double value = next_number(json);
+							camera_height = value;
+							set_camera_height = 1;
+						}
+					}
+					else if(objtype == T_SPHERE)
+					{
+						if(strcmp(key, "radius") == 0)
+						{
+							double value = next_number(json);
 							radius = value;
 							set_radius = 1;
 						}
 					}
-				else if((strcmp(key, "color") == 0) || 
-					(strcmp(key, "position") == 0) || 
-					(strcmp(key, "normal") == 0))
+					else if(strcmp(key, "color") == 0)
 					{
 						double* v3 = next_vector(json);
+						color = v3;
+						set_color = 1;
+					}
+					else if(strcmp(key, "position") == 0)
+					{
+						double* v3 = next_vector(json);
+						color = v3;
+						set_color = 1;
+					}
+					else if(strcmp(key, "normal") == 0)
+					{
+						double* v3 = next_vector(json);
+						color = v3;
+						set_color = 1;
 					}
 				else
 					{
@@ -257,7 +270,7 @@ int read_scene(char* json_name)
 		
 		
 		// error checking to make sure the correct attributes were read in
-		if(objtype == CAMERA)
+		if(objtype == T_CAMERA)
 		{
 			if(set_camera_height != 1)
 			{
@@ -273,8 +286,12 @@ int read_scene(char* json_name)
 				fprintf(stderr, "Warning, Camera does not use position at this time.\n");
 			if(set_normal == 1)
 				fprintf(stderr, "Warning, Camera does not use a normal vector at this time.\n");
+			
+			scene.camera_width = camera_width;
+			scene.camera_height = camera_height;
+			
 		}
-		if(objtype == SPHERE)
+		if(objtype == T_SPHERE)
 		{
 			if(set_radius != 1)
 			{
@@ -296,8 +313,16 @@ int read_scene(char* json_name)
 				fprintf(stderr, "Object must have a position! Line %d\n", line);
 				exit(1);
 			}
+			
+			// compute properties of a sphere
+			
+			new_object.a = position[0];
+			new_object.b = position[1];
+			new_object.c = position[2];
+			new_object.d = radius * radius;
+			
 		}
-		if(objtype == PLANE)
+		if(objtype == T_PLANE)
 		{
 			if(set_color != 1)
 			{
@@ -314,6 +339,14 @@ int read_scene(char* json_name)
 				fprintf(stderr, "Plane must have a normal vector! Line %d\n", line);
 				exit(1);
 			}
+			
+			// calculate the properties of the plane
+			
+			new_object.a = normal[0];
+			new_object.b = normal[1];
+			new_object.c = normal[2];
+			new_object.d = normal[0] * position[0] + normal[1] * position[1] + normal[2] * position[2];
+			
 		}
 		
 		skip_ws(json);
@@ -346,8 +379,61 @@ int read_scene(char* json_name)
 }
 
 
+double intersect_sphere(double* C, double R, double* r0, double* rd)
+{
+	// A = xd^2 + yd^2 + zd^2
+	// B = 2 * (zd * (x0 - xc) + yd * (y0 - yc) + xd * (z0 - zc))
+	// C = (x0 - xc)^2 + (y0 - yc)^2 + (z0 - zc)^2 - r^2
+	
+	double A = sqr(rd[0]) + sqr(rd[1]) + sqr(rd[2]);
+	double B = 2 * (rd[2] * (r0[0] - C[0]) + rd[1] * (r0[1] - C[1]) + rd[0] * (r0[2] - C[2]));
+	double C = sqr(r0[0] - C[0]) + sqr(r0[1] - C[1]) + sqr(r0[2] - C[2]) - sqr(R);
+	
+	double* zeroes = quadratic_formula(A, B, C);
+	
+	if(isnan(zeroes[0]))
+		return -1;
+	
+	if(zeroes[0] > 0) return zeroes[0];
+	if(zeroes[1] > 0) return zeroes[1];
+	return -1;
+}
+
+double intersect_plane(double a, double b, double c, double* r0, double* rd)
+{
+	// t = -(a*x0 + b*y0 + c*z0) / (a*xd + b*yd + c*zd)
+	
+	return -(a*r0[0] + b*r0[1] + c*r0[2]) / (a*rd[0] + b*rd[1] + c*rd[2]);
+}
+
+
+void raycast(Scene scene, char* outfile, PPMmeta fileinfo)
+{
+	Pixel* data = malloc(sizeof(Pixel) * fileinfo.width * fileinfo.height);
+	
+	// raycasting here
+	
+	
+	
+	WritePPM(data, outfile, 6, fileinfo);
+}
+
+
+
+
+
 int main(int argc, char** argv)
 {
+	if(argc < 5)
+	{
+		fprintf(stderr, "Usage: width height input.json output.ppm\n");
+		exit(1);
+	}
+	
+	PPMmeta fileinfo;
+	fileinfo.width = atoi(argv[1]);
+	fileinfo.height = atoi(argv[2]);
+	fileinfo.max = 255;
 	
 	return 0;
 }
