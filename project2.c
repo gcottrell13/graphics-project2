@@ -24,6 +24,7 @@ typedef struct {
 	Object objects[128];
 	double camera_width;
 	double camera_height;
+	double background_color[3]; // for fun!
 } Scene;
 
 int next_c(FILE* file)
@@ -138,7 +139,7 @@ Scene read_scene(char* json_name)
 	Scene scene = malloc(sizeof(Scene));
 	
 	// these will hold data for any objects parsed later
-	Object new_object = malloc(sizeof(Plane));
+	Object new_object = malloc(sizeof(Object));
 	
 	int set_camera_width = 0;
 	double camera_width = 0;
@@ -209,48 +210,48 @@ Scene read_scene(char* json_name)
 				expect_c(json, ':');
 				skip_ws(json);
 				
-					if(objtype == T_CAMERA)
+				if(objtype == T_CAMERA)
+				{
+					if(strcmp(key, "width") == 0)
 					{
-						if(strcmp(key, "width") == 0)
-						{
-							double value = next_number(json);
-							camera_width = value;
-							set_camera_width = 1;
-						}
-						else if(strcmp(key, "height") == 0)
-						{
-							double value = next_number(json);
-							camera_height = value;
-							set_camera_height = 1;
-						}
+						double value = next_number(json);
+						camera_width = value;
+						set_camera_width = 1;
 					}
-					else if(objtype == T_SPHERE)
+					else if(strcmp(key, "height") == 0)
 					{
-						if(strcmp(key, "radius") == 0)
-						{
-							double value = next_number(json);
-							radius = value;
-							set_radius = 1;
-						}
+						double value = next_number(json);
+						camera_height = value;
+						set_camera_height = 1;
 					}
-					else if(strcmp(key, "color") == 0)
+				}
+				else if(strcmp(key, "radius") == 0)
+				{
+					if(objtype == T_SPHERE)
 					{
-						double* v3 = next_vector(json);
-						color = v3;
-						set_color = 1;
+						double value = next_number(json);
+						radius = value;
+						set_radius = 1;
 					}
-					else if(strcmp(key, "position") == 0)
-					{
-						double* v3 = next_vector(json);
-						color = v3;
-						set_color = 1;
-					}
-					else if(strcmp(key, "normal") == 0)
-					{
-						double* v3 = next_vector(json);
-						color = v3;
-						set_color = 1;
-					}
+				}
+				else if(strcmp(key, "color") == 0)
+				{
+					double* v3 = next_vector(json);
+					color = v3;
+					set_color = 1;
+				}
+				else if(strcmp(key, "position") == 0)
+				{
+					double* v3 = next_vector(json);
+					color = v3;
+					set_color = 1;
+				}
+				else if(strcmp(key, "normal") == 0)
+				{
+					double* v3 = next_vector(json);
+					color = v3;
+					set_color = 1;
+				}
 				else
 					{
 						fprintf(stderr, "Error: unknown property: %s on line %d\n", key, line);
@@ -345,6 +346,13 @@ Scene read_scene(char* json_name)
 			new_object.d = normal[0] * position[0] + normal[1] * position[1] + normal[2] * position[2];
 			
 		}
+		
+		// store read object and create a new empty one
+		scene.objects[scene.num_objects] = new_object;
+		scene.num_objects ++;
+		new_object = malloc(sizeof(Object));
+		
+		// continue with reading
 		
 		skip_ws(json);
 		c = next_c(json);
@@ -478,9 +486,18 @@ void raycast(Scene scene, char* outfile, PPMmeta fileinfo)
 			// write to Pixel* data
 			
 			Pixel pixel;
-			pixel.r = closest.color[0];
-			pixel.g = closest.color[1];
-			pixel.b = closest.color[2];
+			if(best_t < INFINITY)
+			{
+				pixel.r = closest.color[0];
+				pixel.g = closest.color[1];
+				pixel.b = closest.color[2];
+			}
+			else
+			{
+				pixel.r = scene.background_color[0];
+				pixel.g = scene.background_color[1];
+				pixel.b = scene.background_color[2];
+			}
 			
 			data[i * N + j] = pixel;
 			
@@ -510,6 +527,10 @@ int main(int argc, char** argv)
 	fileinfo.max = 255;
 	
 	Scene scene = read_scene(argv[3]);
+	
+	scene.background_color[0] = 100;
+	scene.background_color[1] = 110;
+	scene.background_color[2] = 160;
 	
 	raycast(scene, argv[4], fileinfo);
 	
