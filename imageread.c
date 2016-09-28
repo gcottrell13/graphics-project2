@@ -16,10 +16,9 @@ typedef struct {
 // then load file into memory with an unsigned char pointer
 
 // @return int - error code
-int WritePPM(Pixel* data, char* output, int out_type, PPMmeta meta);
+int WritePPM(Pixel* data, char* output, PPMmeta meta);
 
 char* intToStr(int i, int size);
-
 
 int WritePPM(Pixel* data, char* output, PPMmeta meta)
 {
@@ -40,6 +39,7 @@ int WritePPM(Pixel* data, char* output, PPMmeta meta)
 		for(c = 0; c < meta.width * meta.height; c++)
 		{
 			Pixel p = data[c];
+			//printf("%d %d %d\n", p.r, p.g, p.b);
 			char* r = intToStr(p.r, 4);
 			char* g = intToStr(p.g, 4);
 			char* b = intToStr(p.b, 4);
